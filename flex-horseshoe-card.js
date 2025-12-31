@@ -48,6 +48,7 @@ import {
   scale_tickmarks: false,
     horseshoe_style: 'fixed',
     indicator_arrow: false,
+    indicator_arrow_scale: 1,
   }
   
   const DEFAULT_HORSESHOE_SCALE = {
@@ -799,7 +800,16 @@ import {
         this.horseshoeSectionalSegments = null;
       }
       else if (strokeStyle == 'colorstopsectional') {
-        this.horseshoeSectionalSegments = this._buildSectionalSegments(this.colorStops, state);
+        this.horseshoeSectionalSegments = this._buildSectionalSegments(this.colorStops, state, false);
+        const stroke = this.horseshoeSectionalSegments.length
+          ? this.horseshoeSectionalSegments[this.horseshoeSectionalSegments.length - 1].color
+          : this.config.horseshoe_state.color;
+        this.color0 = stroke;
+        this.color1 = stroke;
+        this.color1_offset = '0%';
+      }
+      else if (strokeStyle == 'colorstopgauge') {
+        this.horseshoeSectionalSegments = this._buildSectionalSegments(this.colorStops, state, true);
         const stroke = this.horseshoeSectionalSegments.length
           ? this.horseshoeSectionalSegments[this.horseshoeSectionalSegments.length - 1].color
           : this.config.horseshoe_state.color;
@@ -926,6 +936,9 @@ import {
       };
     if (newConfig.show && newConfig.show.horseshoe_style) {
       newConfig.show.horseshoe_style = newConfig.show.horseshoe_style.toLowerCase();
+    }
+    if (newConfig.show.horseshoe_style === 'colorstopgauge') {
+      newConfig.show.indicator_arrow = true;
     }
   
     for (var entityValue of newConfig.entities) {
@@ -1137,7 +1150,7 @@ import {
     const strokeStyle = (this.config.show && this.config.show.horseshoe_style)
       ? this.config.show.horseshoe_style.toLowerCase()
       : 'fixed';
-    const isSectional = strokeStyle === 'colorstopsectional';
+    const isSectional = strokeStyle === 'colorstopsectional' || strokeStyle === 'colorstopgauge';
 
     return svg`
         <g id="horseshoe__svg__group" class="horseshoe__svg__group">
@@ -1187,7 +1200,10 @@ import {
     if (!config || !config.show || !config.show.indicator_arrow) return;
 
     const angleRad = (this.indicatorAngle || 0) * Math.PI / 180;
-    const arrowLength = HORSESHOE_RADIUS_SIZE * 0.42;
+    const indicatorScale = Number.isFinite(config.show.indicator_arrow_scale)
+      ? Math.max(config.show.indicator_arrow_scale, 0)
+      : 1;
+    const arrowLength = Math.min(HORSESHOE_RADIUS_SIZE, HORSESHOE_RADIUS_SIZE * 0.42 * indicatorScale);
     const arrowWidth = arrowLength / 5;
     const halfWidth = arrowWidth / 2;
 
@@ -1905,14 +1921,16 @@ import {
     return this._getGradientValue(start, end, val);
   }
 
-  _buildSectionalSegments(stops, state) {
+  _buildSectionalSegments(stops, state, useFullRange = false) {
     const min = this.config.horseshoe_scale.min || 0;
     const max = this.config.horseshoe_scale.max || 100;
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
     if (!sortedStops.length || min === max) return [];
 
-    const effectiveMax = Math.min(Math.max(Number(state), min), max);
-    if (effectiveMax <= min) return [];
+    const effectiveMax = useFullRange
+      ? max
+      : Math.min(Math.max(Number(state), min), max);
+    if (!useFullRange && effectiveMax <= min) return [];
 
     const boundaries = [min];
     sortedStops
