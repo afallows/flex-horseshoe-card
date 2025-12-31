@@ -78,7 +78,7 @@ import {
     this.attributesStr = [];
     this.viewBoxSize = SVG_VIEW_BOX;
     this.colorStops = {};
-    this.horseshoeSectionalSegments = null;
+    this.horseshoeGradientStops = null;
     this.animations = {};
     this.animations.vlines = {};
     this.animations.hlines = {};
@@ -769,7 +769,7 @@ import {
         this.color0 = this.config.horseshoe_state.color;
         this.color1 = this.config.horseshoe_state.color;
         this.color1_offset = '0%';
-        this.horseshoeSectionalSegments = null;
+        this.horseshoeGradientStops = null;
         //  We could set the circle attributes, but we do it with a variable as we are using a gradient
         //  to display the horseshoe circle  .. <horseshoe circle>.setAttribute('stroke', stroke);
       }
@@ -782,7 +782,7 @@ import {
         this.color0 = stroke;
         this.color1 = stroke;
         this.color1_offset = '0%';
-        this.horseshoeSectionalSegments = null;
+        this.horseshoeGradientStops = null;
       }
       else if (strokeStyle == 'colorstop' || strokeStyle == 'colorstopgradient') {
         const stroke = this._calculateStrokeColor(state, this.colorStops, strokeStyle === 'colorstopgradient');
@@ -792,12 +792,12 @@ import {
         this.color0 = stroke;
         this.color1 = stroke;
         this.color1_offset = '0%';
-        this.horseshoeSectionalSegments = null;
+        this.horseshoeGradientStops = null;
       }
       else if (strokeStyle == 'colorstopsectional') {
-        this.horseshoeSectionalSegments = this._buildSectionalSegments(this.colorStops, state);
-        const stroke = this.horseshoeSectionalSegments.length
-          ? this.horseshoeSectionalSegments[this.horseshoeSectionalSegments.length - 1].color
+        this.horseshoeGradientStops = this._buildSectionalGradientStops(this.colorStops);
+        const stroke = this.horseshoeGradientStops.length
+          ? this.horseshoeGradientStops[this.horseshoeGradientStops.length - 1].color
           : this.config.horseshoe_state.color;
         this.color0 = stroke;
         this.color1 = stroke;
@@ -815,7 +815,7 @@ import {
         this.color1_offset = `${Math.round((1-val)*100)}%`;
 
         this.angleCoords = angleCoords;
-        this.horseshoeSectionalSegments = null;
+        this.horseshoeGradientStops = null;
       }
   
     // Check for animations linked to an entity or attribute.
@@ -1002,11 +1002,23 @@ import {
 
         <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
           <linearGradient gradientTransform="rotate(0)" id="horseshoe__gradient-${this.cardId}" x1="${this.angleCoords.x1}", y1="${this.angleCoords.y1}", x2="${this.angleCoords.x2}" y2="${this.angleCoords.y2}">
-            <stop offset="${this.color1_offset}" stop-color="${this.color1}" />
-            <stop offset="100%" stop-color="${this.color0}" />
+            ${this._renderGradientStops()}
           </linearGradient>
         </svg>
     </ha-card>
+    `;
+  }
+
+  _renderGradientStops() {
+    if (this.horseshoeGradientStops && this.horseshoeGradientStops.length) {
+      return this.horseshoeGradientStops.map(stop => svg`
+        <stop offset="${stop.offset}" stop-color="${stop.color}" />
+      `);
+    }
+
+    return svg`
+      <stop offset="${this.color1_offset}" stop-color="${this.color1}" />
+      <stop offset="100%" stop-color="${this.color0}" />
     `;
   }
   
@@ -1130,11 +1142,6 @@ import {
   _renderHorseShoe() {
 
     if (!this.config.show.horseshoe) return;
-    const strokeStyle = (this.config.show && this.config.show.horseshoe_style)
-      ? this.config.show.horseshoe_style.toLowerCase()
-      : 'fixed';
-    const isSectional = strokeStyle === 'colorstopsectional';
-    
     return svg`
         <g id="horseshoe__svg__group" class="horseshoe__svg__group">
           <circle id="horseshoe__scale" class="horseshoe__scale" cx="50%" cy="50%" r="45%"
@@ -1145,39 +1152,18 @@ import {
             stroke-linecap="round"
             transform="rotate(-220 100 100)"/>
   
-          ${isSectional ? this._renderSectionalHorseshoe() : svg`
-            <circle id="horseshoe__state__value" class="horseshoe__state__value" cx="50%" cy="50%" r="45%"
-              fill="${this.config.fill || 'rgba(0, 0, 0, 0)'}"
-              stroke="url('#horseshoe__gradient-${this.cardId}')"
-              stroke-dasharray="${this.dashArray}"
-              stroke-width="${this.config.horseshoe_state.width || 12}" 
-              stroke-linecap="round"
-              transform="rotate(-220 100 100)"
-              style="transition: all 2.5s ease-out;"/>
-          `}
+          <circle id="horseshoe__state__value" class="horseshoe__state__value" cx="50%" cy="50%" r="45%"
+            fill="${this.config.fill || 'rgba(0, 0, 0, 0)'}"
+            stroke="url('#horseshoe__gradient-${this.cardId}')"
+            stroke-dasharray="${this.dashArray}"
+            stroke-width="${this.config.horseshoe_state.width || 12}" 
+            stroke-linecap="round"
+            transform="rotate(-220 100 100)"
+            style="transition: all 2.5s ease-out;"/>
           
           ${this._renderTickMarks()}
         </g>
       `;
-  }
-
-  _renderSectionalHorseshoe() {
-    if (!this.horseshoeSectionalSegments || !this.horseshoeSectionalSegments.length) return;
-
-    return this.horseshoeSectionalSegments.map((segment, index) => svg`
-      <circle
-        id="horseshoe__state__value__segment-${index}"
-        class="horseshoe__state__value"
-        cx="50%" cy="50%" r="45%"
-        fill="${this.config.fill || 'rgba(0, 0, 0, 0)'}"
-        stroke="${segment.color}"
-        stroke-dasharray="${segment.dashArray}"
-        stroke-dashoffset="${segment.dashOffset}"
-        stroke-width="${this.config.horseshoe_state.width || 12}"
-        stroke-linecap="butt"
-        transform="rotate(-220 100 100)"
-        style="transition: all 2.5s ease-out;"/>
-    `);
   }
   
   /*******************************************************************************
@@ -1866,44 +1852,31 @@ import {
     return this._getGradientValue(start, end, val);
   }
 
-  _buildSectionalSegments(stops, state) {
+  _buildSectionalGradientStops(stops) {
     const min = this.config.horseshoe_scale.min || 0;
     const max = this.config.horseshoe_scale.max || 100;
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
     if (!sortedStops.length || min === max) return [];
 
-    const effectiveMax = Math.min(Math.max(Number(state), min), max);
-    if (effectiveMax <= min) return [];
+    const gradientStops = [];
+    const startColor = this._calculateStrokeColor(min, stops, false);
+    let previousColor = startColor;
+    gradientStops.push({ offset: '0%', color: startColor });
 
-    const boundaries = [min];
     sortedStops
-      .filter(value => value > min && value < effectiveMax)
-      .forEach(value => boundaries.push(value));
-    boundaries.push(effectiveMax);
-
-    const total = 10 * HORSESHOE_RADIUS_SIZE;
-    const maxRange = max - min;
-    const segments = [];
-
-    for (let i = 0; i < boundaries.length - 1; i++) {
-      const start = boundaries[i];
-      const end = boundaries[i + 1];
-      if (end <= start) continue;
-
-      const startRatio = (start - min) / maxRange;
-      const endRatio = (end - min) / maxRange;
-      const startLen = startRatio * HORSESHOE_PATH_LENGTH;
-      const endLen = endRatio * HORSESHOE_PATH_LENGTH;
-      const length = endLen - startLen;
-
-      segments.push({
-        dashArray: `${length} ${total}`,
-        dashOffset: `${-startLen}`,
-        color: this._calculateStrokeColor(start, stops, false),
+      .filter(value => value > min && value < max)
+      .forEach(value => {
+        const offset = `${((value - min) / (max - min) * 100).toFixed(2)}%`;
+        const nextColor = stops[value];
+        gradientStops.push({ offset, color: previousColor });
+        gradientStops.push({ offset, color: nextColor });
+        previousColor = nextColor;
       });
-    }
 
-    return segments;
+    const endColor = this._calculateStrokeColor(max, stops, false);
+    gradientStops.push({ offset: '100%', color: endColor });
+
+    return gradientStops;
   }
   
    /*******************************************************************************
