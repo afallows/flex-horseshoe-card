@@ -49,6 +49,7 @@ import {
     horseshoe_style: 'fixed',
     indicator_arrow: false,
     indicator_arrow_scale: 1,
+    indicator_arrow_position: 'inside',
   }
   
   const DEFAULT_HORSESHOE_SCALE = {
@@ -937,6 +938,9 @@ import {
     if (newConfig.show && newConfig.show.horseshoe_style) {
       newConfig.show.horseshoe_style = newConfig.show.horseshoe_style.toLowerCase();
     }
+    if (newConfig.show && newConfig.show.indicator_arrow_position) {
+      newConfig.show.indicator_arrow_position = newConfig.show.indicator_arrow_position.toLowerCase();
+    }
     if (newConfig.show.horseshoe_style === 'colorstopgauge') {
       newConfig.show.indicator_arrow = true;
     }
@@ -1191,7 +1195,8 @@ import {
         stroke="${segment.color}"
         stroke-width="${this.config.horseshoe_state.width || 12}"
         stroke-linecap="butt"
-        style="transition: all 2.5s ease-out;"/>
+        stroke-dasharray="${segment.fillLength} ${segment.length}"
+        style="transition: stroke-dasharray 2.5s ease-out, stroke 2.5s ease-out;"/>
     `);
   }
 
@@ -1203,14 +1208,19 @@ import {
     const indicatorScale = Number.isFinite(config.show.indicator_arrow_scale)
       ? Math.max(config.show.indicator_arrow_scale, 0)
       : 1;
+    const indicatorPosition = config.show.indicator_arrow_position || 'inside';
     const arrowLength = Math.min(HORSESHOE_RADIUS_SIZE, HORSESHOE_RADIUS_SIZE * 0.42 * indicatorScale);
     const arrowWidth = arrowLength / 5;
     const halfWidth = arrowWidth / 2;
 
     const centerX = SVG_VIEW_BOX / 2;
     const centerY = SVG_VIEW_BOX / 2;
-    const tipRadius = HORSESHOE_RADIUS_SIZE;
-    const baseRadius = tipRadius - arrowLength;
+    const baseRadius = indicatorPosition === 'outside'
+      ? HORSESHOE_RADIUS_SIZE
+      : HORSESHOE_RADIUS_SIZE - arrowLength;
+    const tipRadius = indicatorPosition === 'outside'
+      ? baseRadius + arrowLength
+      : HORSESHOE_RADIUS_SIZE;
 
     const dirX = Math.cos(angleRad);
     const dirY = Math.sin(angleRad);
@@ -1930,13 +1940,12 @@ import {
     const effectiveMax = useFullRange
       ? max
       : Math.min(Math.max(Number(state), min), max);
-    if (!useFullRange && effectiveMax <= min) return [];
 
     const boundaries = [min];
     sortedStops
-      .filter(value => value > min && value < effectiveMax)
+      .filter(value => value > min && value < max)
       .forEach(value => boundaries.push(value));
-    boundaries.push(effectiveMax);
+    boundaries.push(max);
 
     const maxRange = max - min;
     const segments = [];
@@ -1951,10 +1960,21 @@ import {
       const endRatio = (end - min) / maxRange;
       const startAngle = HORSESHOE_START_ANGLE + (startRatio * HORSESHOE_ARC_ANGLE);
       const endAngle = HORSESHOE_START_ANGLE + (endRatio * HORSESHOE_ARC_ANGLE);
+      const segmentDelta = endAngle - startAngle;
+      const segmentLength = Math.abs(segmentDelta) * Math.PI / 180 * HORSESHOE_RADIUS_SIZE;
+
+      let fillLength = 0;
+      if (effectiveMax > start) {
+        const clampedEnd = Math.min(end, effectiveMax);
+        const fillRatio = (clampedEnd - start) / (end - start);
+        fillLength = segmentLength * Math.max(Math.min(fillRatio, 1), 0);
+      }
 
       segments.push({
         path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, startAngle, endAngle),
         color: this._calculateStrokeColor(start, stops, false),
+        length: segmentLength,
+        fillLength,
       });
     }
 
