@@ -815,6 +815,7 @@ All options are optional.
 |------|:-------:|:---------:|-------|-------------|
 | scale_tickmarks | true | `true` / `false` |  v0.8.0 |Display scale
 | horseshoe_style | `autominmax` | `fixed` / `autominmax`/ `colorstop` / `colorstopgradient` / `colorstopsectional` / `lineargradient`| v0.8.0 | Fill style. Most fill styles need the colorstop list to be specified. See [horseshoe fill style list](#horseshoe-fill-styles) for a description.
+| colorstop_transition | 0 | 0-5 | v1.3.0 | Percentage of each color section to blend as a gradient when using `colorstopsectional` or `colorstopgauge`.
 
 # ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) Card Filter section
 There are some predefined css filters which you can use to give the full card a different look. Besides the predefined, you can also define you rown using the style: section of the yaml card definition and refer to that class as the card_filter:

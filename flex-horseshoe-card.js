@@ -50,6 +50,7 @@ import {
     indicator_arrow: false,
     indicator_arrow_scale: 1,
     indicator_arrow_position: 'inside',
+    colorstop_transition: 0,
   }
   
   const DEFAULT_HORSESHOE_SCALE = {
@@ -801,7 +802,12 @@ import {
         this.horseshoeSectionalSegments = null;
       }
       else if (strokeStyle == 'colorstopsectional') {
-        this.horseshoeSectionalSegments = this._buildSectionalSegments(this.colorStops, state, false);
+        this.horseshoeSectionalSegments = this._buildSectionalSegments(
+          this.colorStops,
+          state,
+          false,
+          this.config.show.colorstop_transition,
+        );
         const stroke = this.horseshoeSectionalSegments.length
           ? this.horseshoeSectionalSegments[this.horseshoeSectionalSegments.length - 1].color
           : this.config.horseshoe_state.color;
@@ -810,7 +816,12 @@ import {
         this.color1_offset = '0%';
       }
       else if (strokeStyle == 'colorstopgauge') {
-        this.horseshoeSectionalSegments = this._buildSectionalSegments(this.colorStops, state, true);
+        this.horseshoeSectionalSegments = this._buildSectionalSegments(
+          this.colorStops,
+          state,
+          true,
+          this.config.show.colorstop_transition,
+        );
         const stroke = this.horseshoeSectionalSegments.length
           ? this.horseshoeSectionalSegments[this.horseshoeSectionalSegments.length - 1].color
           : this.config.horseshoe_state.color;
@@ -940,6 +951,12 @@ import {
     }
     if (newConfig.show && newConfig.show.indicator_arrow_position) {
       newConfig.show.indicator_arrow_position = newConfig.show.indicator_arrow_position.toLowerCase();
+    }
+    if (newConfig.show) {
+      const transition = Number(newConfig.show.colorstop_transition);
+      newConfig.show.colorstop_transition = Number.isFinite(transition)
+        ? Math.min(Math.max(transition, 0), 5)
+        : 0;
     }
     if (newConfig.show.horseshoe_style === 'colorstopgauge') {
       newConfig.show.indicator_arrow = true;
@@ -1186,18 +1203,41 @@ import {
   _renderSectionalHorseshoe() {
     if (!this.horseshoeSectionalSegments || !this.horseshoeSectionalSegments.length) return;
 
-    return this.horseshoeSectionalSegments.map((segment, index) => svg`
-      <path
-        id="horseshoe__state__value__segment-${index}"
-        class="horseshoe__state__value"
-        d="${segment.path}"
-        fill="none"
-        stroke="${segment.color}"
-        stroke-width="${this.config.horseshoe_state.width || 12}"
-        stroke-linecap="butt"
-        stroke-dasharray="${segment.fillLength} ${segment.length}"
-        style="transition: stroke-dasharray 2.5s ease-out, stroke 2.5s ease-out;"/>
-    `);
+    const gradientSegments = this.horseshoeSectionalSegments.filter(segment => segment.gradient);
+
+    return svg`
+      <g class="horseshoe__sectional">
+        ${gradientSegments.length ? svg`
+          <defs>
+            ${gradientSegments.map(segment => svg`
+              <linearGradient
+                id="${segment.gradient.id}"
+                gradientUnits="userSpaceOnUse"
+                x1="${segment.gradient.x1}"
+                y1="${segment.gradient.y1}"
+                x2="${segment.gradient.x2}"
+                y2="${segment.gradient.y2}"
+              >
+                <stop offset="0%" stop-color="${segment.gradient.startColor}" />
+                <stop offset="100%" stop-color="${segment.gradient.endColor}" />
+              </linearGradient>
+            `)}
+          </defs>
+        ` : ''}
+        ${this.horseshoeSectionalSegments.map((segment, index) => svg`
+          <path
+            id="horseshoe__state__value__segment-${index}"
+            class="horseshoe__state__value"
+            d="${segment.path}"
+            fill="none"
+            stroke="${segment.gradient ? `url('#${segment.gradient.id}')` : segment.color}"
+            stroke-width="${this.config.horseshoe_state.width || 12}"
+            stroke-linecap="butt"
+            stroke-dasharray="${segment.fillLength} ${segment.length}"
+            style="transition: stroke-dasharray 2.5s ease-out, stroke 2.5s ease-out;"/>
+        `)}
+      </g>
+    `;
   }
 
   _renderIndicatorArrow() {
@@ -1931,7 +1971,7 @@ import {
     return this._getGradientValue(start, end, val);
   }
 
-  _buildSectionalSegments(stops, state, useFullRange = false) {
+  _buildSectionalSegments(stops, state, useFullRange = false, transitionPercent = 0) {
     const min = Number(this.config.horseshoe_scale.min ?? 0);
     const max = Number(this.config.horseshoe_scale.max ?? 100);
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
@@ -1958,6 +1998,7 @@ import {
 
     const segments = [];
     const center = SVG_VIEW_BOX / 2;
+    const transitionRatio = Math.min(Math.max(Number(transitionPercent) || 0, 0), 5) / 100;
 
     for (let i = 0; i < boundaries.length - 1; i++) {
       const start = boundaries[i];
@@ -1977,14 +2018,48 @@ import {
         : Math.max(Math.min((fillRatio - startRatio) / segmentRange, 1), 0);
       const fillLength = segmentLength * segmentFillRatio;
 
-      const colorValue = stops[start] !== undefined ? start : end;
+      const currentColor = this._calculateStrokeColor(start, stops, false);
+      const nextColor = this._calculateStrokeColor(end, stops, false);
+      const hasGradient = transitionRatio > 0 && i < boundaries.length - 2;
+      const gradientLength = hasGradient ? Math.min(segmentLength * transitionRatio, segmentLength) : 0;
+      const solidLength = Math.max(segmentLength - gradientLength, 0);
+      const solidRatio = segmentLength === 0 ? 0 : solidLength / segmentLength;
+      const solidEndAngle = startAngle + (segmentDelta * solidRatio);
 
-      segments.push({
-        path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, startAngle, endAngle),
-        color: this._calculateStrokeColor(colorValue, stops, false),
-        length: segmentLength,
-        fillLength,
-      });
+      let remainingFill = fillLength;
+
+      if (solidLength > 0) {
+        const solidFill = Math.min(remainingFill, solidLength);
+        remainingFill = Math.max(remainingFill - solidFill, 0);
+        segments.push({
+          path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, startAngle, solidEndAngle),
+          color: currentColor,
+          length: solidLength,
+          fillLength: solidFill,
+        });
+      }
+
+      if (gradientLength > 0) {
+        const gradientFill = Math.min(remainingFill, gradientLength);
+        remainingFill = Math.max(remainingFill - gradientFill, 0);
+        const gradientStart = this._polarToCartesian(center, center, HORSESHOE_RADIUS_SIZE, solidEndAngle);
+        const gradientEnd = this._polarToCartesian(center, center, HORSESHOE_RADIUS_SIZE, endAngle);
+        segments.push({
+          path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, solidEndAngle, endAngle),
+          color: nextColor,
+          gradient: {
+            id: `horseshoe__segment-gradient-${this.cardId}-${segments.length}`,
+            startColor: currentColor,
+            endColor: nextColor,
+            x1: gradientStart.x,
+            y1: gradientStart.y,
+            x2: gradientEnd.x,
+            y2: gradientEnd.y,
+          },
+          length: gradientLength,
+          fillLength: gradientFill,
+        });
+      }
     }
 
     return segments;
