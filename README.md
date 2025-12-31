@@ -676,7 +676,7 @@ The next table describes how the fill styles work:
 | fixed | `horseshoe_state .color` | | | v0.8.0 | Fills the shoe with a single color
 | colorstop | `color_stops` list with at least 2 values | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | v0.8.0 | Fills the shoe with the colorstop color depending on the colorstop value and the value of the state
 | colorstopgradient | `color_stops` list with at least 2 values | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | v0.8.0 | Same as `colorstop`, but a gradient is used between colorstops
-| colorstopsectional | `color_stops` list with at least 2 values | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | v1.3.0 | Shows all color stops as solid sections on the horseshoe, up to the current state value
+| colorstopsectional | `color_stops` list with at least 2 values | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | ![](https://tweakers.net/ext/f/D4Fx1OKp6s7Hb21Wzq9JWCJb/full.png) | v1.3.0 | Shows all color stops as solid sections with hard transitions on the horseshoe, up to the current state value
 | lineargradient | `color_stops` list with at least 2 values | | | v0.8.0 | Uses the first and last entry in the `color_stops` list to display a linear gradient. It always shows the full gradient from start to end color, independent of the states value.
 
 #### The fill style is set in the show section of the card:

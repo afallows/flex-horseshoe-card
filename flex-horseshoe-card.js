@@ -793,7 +793,7 @@ import {
         this.horseshoeGradientStops = null;
       }
       else if (strokeStyle == 'colorstopsectional') {
-        this.horseshoeGradientStops = this._buildSectionalGradientStops(this.colorStops);
+        this.horseshoeGradientStops = this._buildSectionalGradientStops(this.colorStops, state);
         const stroke = this.horseshoeGradientStops.length
           ? this.horseshoeGradientStops[this.horseshoeGradientStops.length - 1].color
           : this.config.horseshoe_state.color;
@@ -1848,18 +1848,19 @@ import {
     return this._getGradientValue(start, end, val);
   }
 
-  _buildSectionalGradientStops(stops) {
+  _buildSectionalGradientStops(stops, state) {
     const min = this.config.horseshoe_scale.min || 0;
     const max = this.config.horseshoe_scale.max || 100;
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
     if (!sortedStops.length || min === max) return [];
 
+    const effectiveMax = Math.min(Math.max(state, min), max);
     const startColor = this._calculateStrokeColor(min, stops, false);
     let previousColor = startColor;
     const gradientStops = [{ offset: '0%', color: startColor }];
 
     sortedStops
-      .filter(value => value > min && value < max)
+      .filter(value => value > min && value <= effectiveMax)
       .forEach(value => {
         const offset = `${((value - min) / (max - min) * 100).toFixed(2)}%`;
         if (previousColor) {
@@ -1869,11 +1870,15 @@ import {
         previousColor = stops[value];
       });
 
-    const endColor = this._calculateStrokeColor(max, stops, false);
+    const endColor = this._calculateStrokeColor(effectiveMax, stops, false);
+    const endOffset = `${((effectiveMax - min) / (max - min) * 100).toFixed(2)}%`;
     if (previousColor !== endColor) {
-      gradientStops.push({ offset: '100%', color: previousColor });
+      gradientStops.push({ offset: endOffset, color: previousColor });
     }
-    gradientStops.push({ offset: '100%', color: endColor });
+    gradientStops.push({ offset: endOffset, color: endColor });
+    if (endOffset !== '100.00%') {
+      gradientStops.push({ offset: '100%', color: endColor });
+    }
 
     return gradientStops;
   }
