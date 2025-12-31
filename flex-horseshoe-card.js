@@ -1932,18 +1932,23 @@ import {
   }
 
   _buildSectionalSegments(stops, state, useFullRange = false) {
-    const min = this.config.horseshoe_scale.min || 0;
-    const max = this.config.horseshoe_scale.max || 100;
+    const min = Number(this.config.horseshoe_scale.min ?? 0);
+    const max = Number(this.config.horseshoe_scale.max ?? 100);
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
-    if (!sortedStops.length || min === max) return [];
+    if (!sortedStops.length || Number.isNaN(min) || Number.isNaN(max) || min === max) return [];
 
     const range = max - min;
     const isDescending = range < 0;
-    const lower = isDescending ? max : min;
-    const upper = isDescending ? min : max;
-    const clampedState = Math.min(Math.max(Number(state), lower), upper);
-    const fillValue = useFullRange ? max : clampedState;
-    const fillRatio = range === 0 ? 0 : (fillValue - min) / range;
+    const lower = Math.min(min, max);
+    const upper = Math.max(min, max);
+
+    const clampValue = (value) => Math.min(Math.max(Number(value), lower), upper);
+    const ratioFor = (value) => {
+      if (range === 0) return 0;
+      return (clampValue(value) - min) / range;
+    };
+
+    const fillRatio = useFullRange ? 1 : ratioFor(state);
 
     const boundaries = [min];
     const betweenStops = sortedStops.filter(value => value > lower && value < upper);
@@ -1959,8 +1964,8 @@ import {
       const end = boundaries[i + 1];
       if (end === start) continue;
 
-      const startRatio = range === 0 ? 0 : (start - min) / range;
-      const endRatio = range === 0 ? 0 : (end - min) / range;
+      const startRatio = ratioFor(start);
+      const endRatio = ratioFor(end);
       const startAngle = HORSESHOE_START_ANGLE + (startRatio * HORSESHOE_ARC_ANGLE);
       const endAngle = HORSESHOE_START_ANGLE + (endRatio * HORSESHOE_ARC_ANGLE);
       const segmentDelta = endAngle - startAngle;
