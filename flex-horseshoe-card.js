@@ -78,6 +78,7 @@ import {
     this.attributesStr = [];
     this.viewBoxSize = SVG_VIEW_BOX;
     this.colorStops = {};
+    this.horseshoeGradientStops = null;
     this.animations = {};
     this.animations.vlines = {};
     this.animations.hlines = {};
@@ -766,6 +767,7 @@ import {
         this.color0 = this.config.horseshoe_state.color;
         this.color1 = this.config.horseshoe_state.color;
         this.color1_offset = '0%';
+        this.horseshoeGradientStops = null;
         //  We could set the circle attributes, but we do it with a variable as we are using a gradient
         //  to display the horseshoe circle  .. <horseshoe circle>.setAttribute('stroke', stroke);
       }
@@ -778,12 +780,23 @@ import {
         this.color0 = stroke;
         this.color1 = stroke;
         this.color1_offset = '0%';
+        this.horseshoeGradientStops = null;
       }
       else if (strokeStyle == 'colorstop' || strokeStyle == 'colorstopgradient') {
         const stroke = this._calculateStrokeColor(state, this.colorStops, strokeStyle === 'colorstopgradient');
-  
+
         // We now use a gradient for the horseshoe, using two colors
         // Set these colors to the colorstop color...
+        this.color0 = stroke;
+        this.color1 = stroke;
+        this.color1_offset = '0%';
+        this.horseshoeGradientStops = null;
+      }
+      else if (strokeStyle == 'colorstopsectional') {
+        this.horseshoeGradientStops = this._buildSectionalGradientStops(this.colorStops);
+        const stroke = this.horseshoeGradientStops.length
+          ? this.horseshoeGradientStops[this.horseshoeGradientStops.length - 1].color
+          : this.config.horseshoe_state.color;
         this.color0 = stroke;
         this.color1 = stroke;
         this.color1_offset = '0%';
@@ -798,8 +811,9 @@ import {
         // Added from https://stackoverflow.com/questions/9025678/how-to-get-a-rotated-linear-gradient-svg-for-use-as-a-background-image
         const angleCoords = {'x1' : '0%', 'y1' : '0%', 'x2': '100%', 'y2' : '0%'};
         this.color1_offset = `${Math.round((1-val)*100)}%`;
-  
+
         this.angleCoords = angleCoords;
+        this.horseshoeGradientStops = null;
       }
   
     // Check for animations linked to an entity or attribute.
@@ -980,14 +994,26 @@ import {
           <div class="container" id="container">
             ${this._renderSvg()}
           </div>
-  
+
         <svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
           <linearGradient gradientTransform="rotate(0)" id="horseshoe__gradient-${this.cardId}" x1="${this.angleCoords.x1}", y1="${this.angleCoords.y1}", x2="${this.angleCoords.x2}" y2="${this.angleCoords.y2}">
-            <stop offset="${this.color1_offset}" stop-color="${this.color1}" />
-            <stop offset="100%" stop-color="${this.color0}" />
+            ${this._renderGradientStops()}
           </linearGradient>
         </svg>
     </ha-card>
+    `;
+  }
+
+  _renderGradientStops() {
+    if (this.horseshoeGradientStops && this.horseshoeGradientStops.length) {
+      return this.horseshoeGradientStops.map(stop => svg`
+        <stop offset="${stop.offset}" stop-color="${stop.color}" />
+      `);
+    }
+
+    return svg`
+      <stop offset="${this.color1_offset}" stop-color="${this.color1}" />
+      <stop offset="100%" stop-color="${this.color0}" />
     `;
   }
   
@@ -1820,6 +1846,36 @@ import {
     }
     }
     return this._getGradientValue(start, end, val);
+  }
+
+  _buildSectionalGradientStops(stops) {
+    const min = this.config.horseshoe_scale.min || 0;
+    const max = this.config.horseshoe_scale.max || 100;
+    const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
+    if (!sortedStops.length || min === max) return [];
+
+    const startColor = this._calculateStrokeColor(min, stops, false);
+    let previousColor = startColor;
+    const gradientStops = [{ offset: '0%', color: startColor }];
+
+    sortedStops
+      .filter(value => value > min && value < max)
+      .forEach(value => {
+        const offset = `${((value - min) / (max - min) * 100).toFixed(2)}%`;
+        if (previousColor) {
+          gradientStops.push({ offset, color: previousColor });
+        }
+        gradientStops.push({ offset, color: stops[value] });
+        previousColor = stops[value];
+      });
+
+    const endColor = this._calculateStrokeColor(max, stops, false);
+    if (previousColor !== endColor) {
+      gradientStops.push({ offset: '100%', color: previousColor });
+    }
+    gradientStops.push({ offset: '100%', color: endColor });
+
+    return gradientStops;
   }
   
    /*******************************************************************************
