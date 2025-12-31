@@ -39,7 +39,9 @@ import {
   // zero degrees is at 3 o'clock.
   const HORSESHOE_RADIUS_SIZE = 0.45 * SVG_VIEW_BOX;
   const TICKMARKS_RADIUS_SIZE = 0.43 * SVG_VIEW_BOX;
-  const HORSESHOE_PATH_LENGTH = 2 * 260/360 * Math.PI * HORSESHOE_RADIUS_SIZE;
+  const HORSESHOE_ARC_ANGLE = 260;
+  const HORSESHOE_START_ANGLE = -220;
+  const HORSESHOE_PATH_LENGTH = 2 * HORSESHOE_ARC_ANGLE/360 * Math.PI * HORSESHOE_RADIUS_SIZE;
   
   const DEFAULT_SHOW = {
     horseshoe: true,
@@ -1165,17 +1167,14 @@ import {
     if (!this.horseshoeSectionalSegments || !this.horseshoeSectionalSegments.length) return;
 
     return this.horseshoeSectionalSegments.map((segment, index) => svg`
-      <circle
+      <path
         id="horseshoe__state__value__segment-${index}"
         class="horseshoe__state__value"
-        cx="50%" cy="50%" r="45%"
-        fill="${this.config.fill || 'rgba(0, 0, 0, 0)'}"
+        d="${segment.path}"
+        fill="none"
         stroke="${segment.color}"
-        stroke-dasharray="${segment.dashArray}"
-        stroke-dashoffset="${segment.dashOffset}"
         stroke-width="${this.config.horseshoe_state.width || 12}"
         stroke-linecap="butt"
-        transform="rotate(-220 100 100)"
         style="transition: all 2.5s ease-out;"/>
     `);
   }
@@ -1881,9 +1880,9 @@ import {
       .forEach(value => boundaries.push(value));
     boundaries.push(effectiveMax);
 
-    const total = 10 * HORSESHOE_RADIUS_SIZE;
     const maxRange = max - min;
     const segments = [];
+    const center = SVG_VIEW_BOX / 2;
 
     for (let i = 0; i < boundaries.length - 1; i++) {
       const start = boundaries[i];
@@ -1892,18 +1891,33 @@ import {
 
       const startRatio = (start - min) / maxRange;
       const endRatio = (end - min) / maxRange;
-      const startLen = startRatio * HORSESHOE_PATH_LENGTH;
-      const endLen = endRatio * HORSESHOE_PATH_LENGTH;
-      const length = endLen - startLen;
+      const startAngle = HORSESHOE_START_ANGLE + (startRatio * HORSESHOE_ARC_ANGLE);
+      const endAngle = HORSESHOE_START_ANGLE + (endRatio * HORSESHOE_ARC_ANGLE);
 
       segments.push({
-        dashArray: `${length} ${total}`,
-        dashOffset: `${-startLen}`,
+        path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, startAngle, endAngle),
         color: this._calculateStrokeColor(start, stops, false),
       });
     }
 
     return segments;
+  }
+
+  _polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+    const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
+    return {
+      x: centerX + (radius * Math.cos(angleInRadians)),
+      y: centerY + (radius * Math.sin(angleInRadians)),
+    };
+  }
+
+  _describeArc(centerX, centerY, radius, startAngle, endAngle) {
+    const start = this._polarToCartesian(centerX, centerY, radius, startAngle);
+    const end = this._polarToCartesian(centerX, centerY, radius, endAngle);
+    const delta = endAngle - startAngle;
+    const largeArcFlag = Math.abs(delta) > 180 ? 1 : 0;
+    const sweepFlag = delta >= 0 ? 1 : 0;
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`;
   }
   
    /*******************************************************************************
