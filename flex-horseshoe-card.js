@@ -1937,15 +1937,18 @@ import {
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
     if (!sortedStops.length || min === max) return [];
 
-    const clampedState = Math.min(Math.max(Number(state), min), max);
     const range = max - min;
+    const isDescending = range < 0;
+    const lower = isDescending ? max : min;
+    const upper = isDescending ? min : max;
+    const clampedState = Math.min(Math.max(Number(state), lower), upper);
     const fillValue = useFullRange ? max : clampedState;
     const fillRatio = range === 0 ? 0 : (fillValue - min) / range;
 
     const boundaries = [min];
-    sortedStops
-      .filter(value => value > min && value < max)
-      .forEach(value => boundaries.push(value));
+    const betweenStops = sortedStops.filter(value => value > lower && value < upper);
+    const orderedStops = isDescending ? betweenStops.sort((a, b) => b - a) : betweenStops;
+    orderedStops.forEach(value => boundaries.push(value));
     boundaries.push(max);
 
     const segments = [];
@@ -1954,7 +1957,7 @@ import {
     for (let i = 0; i < boundaries.length - 1; i++) {
       const start = boundaries[i];
       const end = boundaries[i + 1];
-      if (end <= start) continue;
+      if (end === start) continue;
 
       const startRatio = range === 0 ? 0 : (start - min) / range;
       const endRatio = range === 0 ? 0 : (end - min) / range;
@@ -2006,7 +2009,12 @@ import {
     */
   
   _calculateValueBetween(start, end, val) {
-    return (Math.min(Math.max(val, start), end) - start) / (end - start);
+    const lower = Math.min(start, end);
+    const upper = Math.max(start, end);
+    const clamped = Math.min(Math.max(val, lower), upper);
+    const range = end - start;
+    if (range === 0) return 0;
+    return (clamped - start) / range;
   }
   
   _getLovelacePanel() {
