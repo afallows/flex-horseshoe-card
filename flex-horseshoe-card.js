@@ -1972,7 +1972,7 @@ import {
         : Math.max(Math.min((fillRatio - startRatio) / segmentRange, 1), 0);
       const fillLength = segmentLength * segmentFillRatio;
 
-      const colorValue = (end === max && stops[end] !== undefined) ? end : start;
+      const colorValue = stops[end] !== undefined ? end : start;
 
       segments.push({
         path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, startAngle, endAngle),
