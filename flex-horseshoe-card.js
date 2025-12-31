@@ -760,7 +760,9 @@ import {
       // We must draw the horseshoe. Depending on the stroke settings, we draw a fixed color, gradient, autominmax or colorstop 
       // #TODO: only if state or attribute has changed.
   
-      const strokeStyle = this.config.show.horseshoe_style;
+      const strokeStyle = (this.config.show && this.config.show.horseshoe_style)
+        ? this.config.show.horseshoe_style.toLowerCase()
+        : 'fixed';
     
       if (strokeStyle == 'fixed') {
         this.stroke_color = this.config.horseshoe_state.color;
@@ -918,6 +920,9 @@ import {
         horseshoe_scale: { ...DEFAULT_HORSESHOE_SCALE, ...config.horseshoe_scale },
         horseshoe_state: { ...DEFAULT_HORSESHOE_STATE, ...config.horseshoe_state },
       };
+    if (newConfig.show && newConfig.show.horseshoe_style) {
+      newConfig.show.horseshoe_style = newConfig.show.horseshoe_style.toLowerCase();
+    }
   
     for (var entityValue of newConfig.entities) {
       if (!entityValue.tap_action) {
@@ -1125,7 +1130,9 @@ import {
   _renderHorseShoe() {
 
     if (!this.config.show.horseshoe) return;
-    const strokeStyle = this.config.show.horseshoe_style;
+    const strokeStyle = (this.config.show && this.config.show.horseshoe_style)
+      ? this.config.show.horseshoe_style.toLowerCase()
+      : 'fixed';
     const isSectional = strokeStyle === 'colorstopsectional';
     
     return svg`
