@@ -47,6 +47,7 @@ import {
     horseshoe: true,
   scale_tickmarks: false,
     horseshoe_style: 'fixed',
+    indicator_arrow: false,
   }
   
   const DEFAULT_HORSESHOE_SCALE = {
@@ -758,6 +759,7 @@ import {
     const score = val * HORSESHOE_PATH_LENGTH;
     const total = 10 * HORSESHOE_RADIUS_SIZE;
     this.dashArray = `${score} ${total}`;
+    this.indicatorAngle = HORSESHOE_START_ANGLE + (HORSESHOE_ARC_ANGLE * val);
   
       // We must draw the horseshoe. Depending on the stroke settings, we draw a fixed color, gradient, autominmax or colorstop 
       // #TODO: only if state or attribute has changed.
@@ -1159,6 +1161,7 @@ import {
           `}
           
           ${this._renderTickMarks()}
+          ${this._renderIndicatorArrow()}
         </g>
       `;
   }
@@ -1177,6 +1180,43 @@ import {
         stroke-linecap="butt"
         style="transition: all 2.5s ease-out;"/>
     `);
+  }
+
+  _renderIndicatorArrow() {
+    const { config } = this;
+    if (!config || !config.show || !config.show.indicator_arrow) return;
+
+    const angleRad = (this.indicatorAngle || 0) * Math.PI / 180;
+    const arrowLength = HORSESHOE_RADIUS_SIZE * 0.42;
+    const arrowWidth = arrowLength / 5;
+    const halfWidth = arrowWidth / 2;
+
+    const centerX = SVG_VIEW_BOX / 2;
+    const centerY = SVG_VIEW_BOX / 2;
+    const tipRadius = HORSESHOE_RADIUS_SIZE;
+    const baseRadius = tipRadius - arrowLength;
+
+    const dirX = Math.cos(angleRad);
+    const dirY = Math.sin(angleRad);
+    const perpX = -dirY;
+    const perpY = dirX;
+
+    const tipX = centerX + dirX * tipRadius;
+    const tipY = centerY + dirY * tipRadius;
+    const baseX = centerX + dirX * baseRadius;
+    const baseY = centerY + dirY * baseRadius;
+
+    const baseLeftX = baseX + perpX * halfWidth;
+    const baseLeftY = baseY + perpY * halfWidth;
+    const baseRightX = baseX - perpX * halfWidth;
+    const baseRightY = baseY - perpY * halfWidth;
+
+    return svg`
+      <polygon
+        id="horseshoe__indicator_arrow"
+        points="${tipX},${tipY} ${baseLeftX},${baseLeftY} ${baseRightX},${baseRightY}"
+        fill="var(--primary-text-color)"/>
+    `;
   }
   
   /*******************************************************************************
