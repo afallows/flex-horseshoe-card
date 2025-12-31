@@ -1216,10 +1216,10 @@ import {
     const centerX = SVG_VIEW_BOX / 2;
     const centerY = SVG_VIEW_BOX / 2;
     const baseRadius = indicatorPosition === 'outside'
-      ? HORSESHOE_RADIUS_SIZE
+      ? HORSESHOE_RADIUS_SIZE + arrowLength
       : HORSESHOE_RADIUS_SIZE - arrowLength;
     const tipRadius = indicatorPosition === 'outside'
-      ? baseRadius + arrowLength
+      ? HORSESHOE_RADIUS_SIZE
       : HORSESHOE_RADIUS_SIZE;
 
     const dirX = Math.cos(angleRad);
@@ -1937,9 +1937,10 @@ import {
     const sortedStops = Object.keys(stops).map(n => Number(n)).sort((a, b) => a - b);
     if (!sortedStops.length || min === max) return [];
 
-    const effectiveMax = useFullRange
-      ? max
-      : Math.min(Math.max(Number(state), min), max);
+    const clampedState = Math.min(Math.max(Number(state), min), max);
+    const range = max - min;
+    const fillValue = useFullRange ? max : clampedState;
+    const fillRatio = range === 0 ? 0 : (fillValue - min) / range;
 
     const boundaries = [min];
     sortedStops
@@ -1947,7 +1948,6 @@ import {
       .forEach(value => boundaries.push(value));
     boundaries.push(max);
 
-    const maxRange = max - min;
     const segments = [];
     const center = SVG_VIEW_BOX / 2;
 
@@ -1956,19 +1956,18 @@ import {
       const end = boundaries[i + 1];
       if (end <= start) continue;
 
-      const startRatio = (start - min) / maxRange;
-      const endRatio = (end - min) / maxRange;
+      const startRatio = range === 0 ? 0 : (start - min) / range;
+      const endRatio = range === 0 ? 0 : (end - min) / range;
       const startAngle = HORSESHOE_START_ANGLE + (startRatio * HORSESHOE_ARC_ANGLE);
       const endAngle = HORSESHOE_START_ANGLE + (endRatio * HORSESHOE_ARC_ANGLE);
       const segmentDelta = endAngle - startAngle;
       const segmentLength = Math.abs(segmentDelta) * Math.PI / 180 * HORSESHOE_RADIUS_SIZE;
 
-      let fillLength = 0;
-      if (effectiveMax > start) {
-        const clampedEnd = Math.min(end, effectiveMax);
-        const fillRatio = (clampedEnd - start) / (end - start);
-        fillLength = segmentLength * Math.max(Math.min(fillRatio, 1), 0);
-      }
+      const segmentRange = endRatio - startRatio;
+      const segmentFillRatio = segmentRange === 0
+        ? 0
+        : Math.max(Math.min((fillRatio - startRatio) / segmentRange, 1), 0);
+      const fillLength = segmentLength * segmentFillRatio;
 
       segments.push({
         path: this._describeArc(center, center, HORSESHOE_RADIUS_SIZE, startAngle, endAngle),
